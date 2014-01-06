@@ -1093,7 +1093,13 @@ void cmGlobalNinjaGenerator::WriteTargetRebuildManifest(std::ostream& os)
   for (std::vector<cmLocalGenerator *>::const_iterator i =
        this->LocalGenerators.begin(); i != this->LocalGenerators.end(); ++i) {
     const std::vector<std::string>& lf = (*i)->GetMakefile()->GetListFiles();
-    implicitDeps.insert(implicitDeps.end(), lf.begin(), lf.end());
+    cmLocalNinjaGenerator *ng = static_cast<cmLocalNinjaGenerator *>(*i);
+    for(std::vector<std::string>::const_iterator
+          J = lf.begin(), JE = lf.end();
+        J != JE; ++J)
+      {
+        implicitDeps.push_back( ng->ConvertToNinjaPath( J->c_str() ) );
+      }
 
     const std::vector<std::string>& of = (*i)->GetMakefile()->GetOutputFiles();
     implicitDeps.insert(implicitDeps.end(), of.begin(), of.end());
