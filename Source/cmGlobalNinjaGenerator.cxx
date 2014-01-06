@@ -241,13 +241,27 @@ void cmGlobalNinjaGenerator::AddCustomCommandRule()
                 /*restat*/ true);
 }
 
+void cmGlobalNinjaGenerator::AddCustomGeneratorRule()
+{
+  this->AddRule("CUSTOM_GENERATOR",
+                "$COMMAND",
+                "$DESC",
+                "Rule for running custom generators.",
+                /*depfile*/ "",
+                /*rspfile*/ "",
+                /*rspcontent*/ "",
+                /*restat*/ true,
+                /*generator*/ true);
+}
+
 void
 cmGlobalNinjaGenerator::WriteCustomCommandBuild(const std::string& command,
                                                 const std::string& description,
                                                 const std::string& comment,
                                                 const cmNinjaDeps& outputs,
                                                 const cmNinjaDeps& deps,
-                                              const cmNinjaDeps& orderOnlyDeps)
+                                                const cmNinjaDeps& orderOnlyDeps,
+                                                bool isGenerator)
 {
   std::string cmd = command;
 #ifdef _WIN32
@@ -256,7 +270,10 @@ cmGlobalNinjaGenerator::WriteCustomCommandBuild(const std::string& command,
       cmd = "cmd.exe /c";
 #endif
 
-  this->AddCustomCommandRule();
+  if (isGenerator)
+    this->AddCustomGeneratorRule();
+  else
+    this->AddCustomCommandRule();
 
   cmNinjaVars vars;
   vars["COMMAND"] = cmd;
@@ -264,7 +281,7 @@ cmGlobalNinjaGenerator::WriteCustomCommandBuild(const std::string& command,
 
   this->WriteBuild(*this->BuildFileStream,
                    comment,
-                   "CUSTOM_COMMAND",
+                   (isGenerator ? "CUSTOM_GENERATOR" : "CUSTOM_COMMAND"),
                    outputs,
                    deps,
                    cmNinjaDeps(),
@@ -1117,6 +1134,21 @@ void cmGlobalNinjaGenerator::WriteTargetRebuildManifest(std::ostream& os)
                    implicitDeps,
                    /*orderOnlyDeps=*/ cmNinjaDeps(),
                    /*variables=*/ cmNinjaVars());
+
+  // Prune custom generator in phony targets.
+  for (std::vector<cmLocalGenerator *>::const_iterator i =
+       this->LocalGenerators.begin(); i != this->LocalGenerators.end(); ++i) {
+    cmLocalNinjaGenerator *ng = static_cast<cmLocalNinjaGenerator *>(*i);
+    const cmLocalNinjaGenerator::CustomGeneratorFileSet& genfiles
+      = ng->GetCustomGeneratorFiles();
+    for (cmNinjaDeps::iterator
+           II = implicitDeps.begin(), EE = implicitDeps.end();
+         II != EE;)
+      if (genfiles.find(*II) == genfiles.end())
+        ++II;
+      else
+        II = implicitDeps.erase(II);
+  }
 
   this->WritePhonyBuild(os,
                         "A missing CMake input file is not an error.",

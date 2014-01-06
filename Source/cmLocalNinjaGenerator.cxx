@@ -327,9 +327,15 @@ cmLocalNinjaGenerator::WriteCustomCommandBuildStatement(
   const std::vector<std::string> &outputs = cc->GetOutputs();
   cmNinjaDeps ninjaOutputs(outputs.size()), ninjaDeps;
 
+  const std::vector<std::string>& lf = this->GetMakefile()->GetListFiles();
+
   std::transform(outputs.begin(), outputs.end(),
                  ninjaOutputs.begin(), MapToNinjaPath());
   this->AppendCustomCommandDeps(cc, ninjaDeps);
+
+  bool isGenerator = (std::find(lf.begin(), lf.end(), outputs[0]) != lf.end());
+  if (isGenerator)
+    CustomGeneratorFiles.insert(ninjaOutputs.begin(), ninjaOutputs.end());
 
   for (cmNinjaDeps::iterator i = ninjaOutputs.begin(); i != ninjaOutputs.end();
        ++i)
@@ -355,7 +361,8 @@ cmLocalNinjaGenerator::WriteCustomCommandBuildStatement(
       "Custom command for " + ninjaOutputs[0],
       ninjaOutputs,
       ninjaDeps,
-      orderOnlyDeps);
+      orderOnlyDeps,
+      isGenerator);
   }
 }
 

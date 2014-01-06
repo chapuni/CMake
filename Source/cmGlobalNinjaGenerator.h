@@ -104,7 +104,8 @@ public:
                                const std::string& comment,
                                const cmNinjaDeps& outputs,
                                const cmNinjaDeps& deps = cmNinjaDeps(),
-                             const cmNinjaDeps& orderOnlyDeps = cmNinjaDeps());
+                               const cmNinjaDeps& orderOnlyDeps = cmNinjaDeps(),
+                               bool isGenerator = false);
   void WriteMacOSXContentBuild(const std::string& input,
                                const std::string& output);
 
@@ -248,6 +249,7 @@ public:
   bool HasRule(const std::string& name);
 
   void AddCustomCommandRule();
+  void AddCustomGeneratorRule();
   void AddMacOSXContentRule();
 
   bool HasCustomCommandOutput(const std::string &output) {
