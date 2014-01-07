@@ -335,7 +335,7 @@ cmLocalNinjaGenerator::WriteCustomCommandBuildStatement(
 
   bool isGenerator = (std::find(lf.begin(), lf.end(), outputs[0]) != lf.end());
   if (isGenerator)
-    CustomGeneratorFiles.insert(ninjaOutputs.begin(), ninjaOutputs.end());
+    CustomGenerators.push_back(cc);
 
   for (cmNinjaDeps::iterator i = ninjaOutputs.begin(); i != ninjaOutputs.end();
        ++i)

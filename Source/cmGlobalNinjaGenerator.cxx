@@ -1119,7 +1119,16 @@ void cmGlobalNinjaGenerator::WriteTargetRebuildManifest(std::ostream& os)
       }
 
     const std::vector<std::string>& of = (*i)->GetMakefile()->GetOutputFiles();
+#if 1
+    for(std::vector<std::string>::const_iterator
+          J = of.begin(), JE = of.end();
+        J != JE; ++J)
+      {
+        implicitDeps.push_back( ng->ConvertToNinjaPath( J->c_str() ) );
+      }
+#else
     implicitDeps.insert(implicitDeps.end(), of.begin(), of.end());
+#endif
   }
   std::sort(implicitDeps.begin(), implicitDeps.end());
   implicitDeps.erase(std::unique(implicitDeps.begin(), implicitDeps.end()),
@@ -1135,20 +1144,39 @@ void cmGlobalNinjaGenerator::WriteTargetRebuildManifest(std::ostream& os)
                    /*orderOnlyDeps=*/ cmNinjaDeps(),
                    /*variables=*/ cmNinjaVars());
 
+#if 1
   // Prune custom generator in phony targets.
   for (std::vector<cmLocalGenerator *>::const_iterator i =
        this->LocalGenerators.begin(); i != this->LocalGenerators.end(); ++i) {
     cmLocalNinjaGenerator *ng = static_cast<cmLocalNinjaGenerator *>(*i);
-    const cmLocalNinjaGenerator::CustomGeneratorFileSet& genfiles
-      = ng->GetCustomGeneratorFiles();
-    for (cmNinjaDeps::iterator
-           II = implicitDeps.begin(), EE = implicitDeps.end();
-         II != EE;)
-      if (genfiles.find(*II) == genfiles.end())
-        ++II;
-      else
-        II = implicitDeps.erase(II);
+    const cmLocalNinjaGenerator::CustomGeneratorsTy& gentargets
+      = ng->GetCustomGenerators();
+    for (cmLocalNinjaGenerator::CustomGeneratorsTy::const_iterator
+           II = gentargets.begin(), EE = gentargets.end();
+         II != EE; ++II) {
+      const cmNinjaDeps& outputs = (*II)->GetOutputs();
+      const cmNinjaDeps& depends = (*II)->GetDepends();
+      std::string nino = ng->ConvertToNinjaPath(outputs[0].c_str());
+      // FIXME: why find(std::vector)?
+      cmNinjaDeps::iterator idx = find(implicitDeps.begin(), implicitDeps.end(), nino);
+      if (idx == implicitDeps.end())
+        continue;
+      implicitDeps.erase(idx);
+      // Insert CustomGenerator-dependent files.
+      //implicitDeps.insert(implicitDeps.end(), depends.begin(), depends.end());
+      for (cmNinjaDeps::const_iterator DI = depends.begin(), DE = depends.end();
+           DI != DE; ++DI) {
+        // FIXME: Prune seen targets here.
+        std::string xxx = ng->ConvertToNinjaPath(DI->c_str());
+        if (xxx[0] == '/')
+          implicitDeps.push_back(xxx);
+      }
+    }
   }
+  std::sort(implicitDeps.begin(), implicitDeps.end());
+  implicitDeps.erase(std::unique(implicitDeps.begin(), implicitDeps.end()),
+                     implicitDeps.end());
+#endif
 
   this->WritePhonyBuild(os,
                         "A missing CMake input file is not an error.",

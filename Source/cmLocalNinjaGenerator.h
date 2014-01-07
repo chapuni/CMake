@@ -97,8 +97,8 @@ public:
   void AppendCustomCommandDeps(const cmCustomCommand *cc,
                                cmNinjaDeps &ninjaDeps);
 
-  typedef std::set<std::string> CustomGeneratorFileSet;
-  const CustomGeneratorFileSet& GetCustomGeneratorFiles() const {return CustomGeneratorFiles;}
+  typedef std::vector<const cmCustomCommand*> CustomGeneratorsTy;
+  const CustomGeneratorsTy& GetCustomGenerators() const {return CustomGenerators;}
 
   virtual std::string ConvertToLinkReference(std::string const& lib);
 
@@ -132,7 +132,7 @@ private:
     CustomCommandTargetMap;
   CustomCommandTargetMap CustomCommandTargets;
 
-  CustomGeneratorFileSet CustomGeneratorFiles;
+  CustomGeneratorsTy CustomGenerators;
 };
 
 #endif // ! cmLocalNinjaGenerator_h
