@@ -1000,6 +1000,8 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatements(
       this->GeneratorTarget, orderOnlyDeps, config, fileConfig,
       DependOnTargetOrdering);
 
+    int ooi = orderOnlyDeps.size();
+
     // Add order-only dependencies on other files associated with the target.
     cm::append(orderOnlyDeps, this->Configs[config].ExtraFiles);
 
@@ -1015,6 +1017,24 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatements(
                      std::back_inserter(orderOnlyDeps),
                      this->MapToNinjaPath());
     }
+
+#if 1
+    auto& ooe = this->GetGlobalGenerator()->OO2Cache[this->OrderDependsTargetForTarget(config)];
+    ooe.target = this->GeneratorTarget;
+    for (; ooi < orderOnlyDeps.size(); ++ooi) {
+      ooe.appendices.insert(orderOnlyDeps[ooi]);
+    }
+#endif
+
+#if 0
+    {
+      auto& xxx = this->GetGlobalGenerator()->OrderOnlyDepCache[this->OrderDependsTargetForTarget(config)];
+      for (; ooi < orderOnlyDeps.size(); ++ooi) {
+	xxx.extra.insert(orderOnlyDeps[ooi]);
+	fprintf(stderr, "\t* %s %s\n", this->OrderDependsTargetForTarget(config).c_str(), orderOnlyDeps[ooi].c_str());
+      }
+    }
+#endif
 
     std::sort(orderOnlyDeps.begin(), orderOnlyDeps.end());
     orderOnlyDeps.erase(

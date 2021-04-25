@@ -18,6 +18,7 @@
 
 #include "cmsys/FStream.hxx"
 
+#include "cmCustomCommandGenerator.h"
 #include "cmDocumentationEntry.h"
 #include "cmFortranParser.h"
 #include "cmGeneratedFileStream.h"
@@ -35,6 +36,7 @@
 #include "cmProperty.h"
 #include "cmRange.h"
 #include "cmScanDepFormat.h"
+#include "cmSourceFile.h"
 #include "cmState.h"
 #include "cmStateDirectory.h"
 #include "cmStateSnapshot.h"
@@ -1235,8 +1237,6 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
       outputs.push_back(this->BuildAlias(this->ConvertToNinjaPath(d), config));
     }
   } else {
-    cmNinjaDeps outs;
-
     auto computeISPCOuputs = [](cmGlobalNinjaGenerator* gg,
                                 cmGeneratorTarget const* depTarget,
                                 cmNinjaDeps& outputDeps,
@@ -1257,21 +1257,175 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
       }
     };
 
-    for (cmTargetDepend const& targetDep :
-         this->GetTargetDirectDepends(target)) {
+#if 1
+    if (depends != DependOnTargetOrdering) {
+      cmNinjaDeps outs;
+
+      for (cmTargetDepend const& targetDep :
+             this->GetTargetDirectDepends(target)) {
+        if (!targetDep->IsInBuildSystem()) {
+          continue;
+        }
+        if (targetDep.IsCross()) {
+          this->AppendTargetOutputs(targetDep, outs, fileConfig, depends);
+          computeISPCOuputs(this, targetDep, outs, fileConfig);
+        } else {
+          this->AppendTargetOutputs(targetDep, outs, config, depends);
+          computeISPCOuputs(this, targetDep, outs, config);
+        }
+      }
+      std::sort(outs.begin(), outs.end());
+      cm::append(outputs, outs);
+      return;
+    }
+#endif
+
+    //std::string name = this->OrderDependsTargetForTarget(target, config);
+    auto& ent = this->OrderOnlyDepCache[target];
+    if (ent.valid) {
+      cm::append(outputs, ent.SortedDepsO);
+      return;
+    }
+
+    ent = OrderOnlyDepCacheEnt();
+
+    cmNinjaDeps& outsO = ent.SortedDepsO;
+
+    fprintf(stderr, "<%s:>\n", target->GetName().c_str());
+
+    //std::vector<cmTargetDepend> queue0;
+    auto& queue0 = ent.ttts;
+    std::unordered_set<const cmGeneratorTarget*> queueset0;
+    for (const auto& targetDepend : this->GetTargetDirectDepends(target)) {
+      queue0.push_back(targetDepend);
+      queueset0.insert(targetDepend);
+    }
+
+    int orig_size = queue0.size();
+    for (int i = 0; i < queue0.size(); ++i) {
+      const auto& targetDep = queue0[i];
+
       if (!targetDep->IsInBuildSystem()) {
         continue;
       }
-      if (targetDep.IsCross()) {
-        this->AppendTargetOutputs(targetDep, outs, fileConfig, depends);
-        computeISPCOuputs(this, targetDep, outs, fileConfig);
-      } else {
-        this->AppendTargetOutputs(targetDep, outs, config, depends);
-        computeISPCOuputs(this, targetDep, outs, config);
+
+      std::string tconfig = (targetDep.IsCross() ? fileConfig : config);
+
+      computeISPCOuputs(this, targetDep, ent.depsc, tconfig);
+
+      cmNinjaDeps tO;
+      this->AppendTargetOutputs(targetDep, tO, tconfig, DependOnTargetOrdering);
+      cm::append(ent.depsO, tO);
+
+      if (i < orig_size) {
+	ent.szO = ent.depsO.size();
+	ent.szc = ent.depsc.size();
+      }
+
+      std::string ooname = this->OrderDependsTargetForTarget(targetDep, tconfig);
+      if (tO.size() == 1 && tO[0] == ooname) {
+	if (this->OO2Cache.find(ooname) == this->OO2Cache.end()) {
+	  fprintf(stderr, "\tNOTFOUND<%s>\n", ooname.c_str());
+	  ent.incomplete = true;
+	  break;
+	} else {
+	  const auto& oo2oo = this->OO2Cache[ooname];
+	  const auto& oo2ent = this->OrderOnlyDepCache[oo2oo.target];
+	  if (oo2ent.incomplete) {
+	    fprintf(stderr, "\tINCOMPLETE<%s>\n", ooname.c_str());
+	    ent.incomplete = true;
+	    break;
+	  }
+	  fprintf(stderr, "\too<%s>%d\n", ooname.c_str(), oo2ent.ttts.size());
+	  for (auto& s : oo2oo.appendices) {
+	    fprintf(stderr, "\t\tapp<%s>\n", s.c_str());
+	  }
+	  for (const auto& d : oo2ent.ttts) {
+	    if (queueset0.find(d) == queueset0.end()) {
+	      queue0.push_back(d);
+	      queueset0.insert(d);
+	    } else {
+	      fprintf(stderr, "\t\tDUP<%s>\n", d->GetName().c_str());
+	    }
+	  }
+	}
+	queue0.erase(queue0.begin() + i--);
+      } else if (targetDep->GetType() == cmStateEnums::UTILITY) {
+#if 1
+	std::vector<cmSourceFile const*> customCommands;
+	targetDep->GetCustomCommands(customCommands, tconfig);
+	int cusn = 0;
+	for (cmSourceFile const* sf : customCommands) {
+	  cmCustomCommand const* cc = sf->GetCustomCommand();
+	  cmCustomCommandGenerator ccg(*cc, tconfig, targetDep->GetLocalGenerator());
+	  if (ccg.GetNumberOfCommands() == 0) continue;
+	  for (auto& out : ccg.GetOutputs()) {
+	    auto rout = this->ConvertToNinjaPath(out);
+	    ent.outputs[rout].insert(targetDep);
+	    ++cusn;
+	  }
+	}
+	if (cusn == 0) {
+	  for (const auto& tdd : this->GetTargetDirectDepends(targetDep)) {
+	    if (queueset0.find(tdd) == queueset0.end()) {
+	      queue0.push_back(tdd);
+	      queueset0.insert(tdd);
+	    }
+	  }
+	  queue0.erase(queue0.begin() + i--);
+	}
+#else
+	std::unordered_set<const cmGeneratorTarget*> queue;
+	queue.insert(targetDep);
+	for (auto I = queue.begin();
+	     I != queue.end();
+	     queue.erase(I), I = queue.begin())
+	  {
+	    const cmGeneratorTarget* x = *I;
+	    std::vector<cmSourceFile const*> customCommands;
+	    (*I)->GetCustomCommands(customCommands, tconfig);
+	    int cusn = 0;
+	    for (cmSourceFile const* sf : customCommands) {
+	      cmCustomCommand const* cc = sf->GetCustomCommand();
+	      cmCustomCommandGenerator ccg(*cc, tconfig, (*I)->GetLocalGenerator());
+	      if (ccg.GetNumberOfCommands() == 0) continue;
+	      for (auto& out : ccg.GetOutputs()) {
+		auto rout = this->ConvertToNinjaPath(out);
+		ent.outputs[rout].insert(*I);
+		++cusn;
+	      }
+	    }
+	    if (cusn == 0) {
+	      for (const auto& tdd : this->GetTargetDirectDepends(x)) {
+		queue.insert(tdd);
+	      }
+	      I = queue.find(x);
+	    }
+	  }
+	queue0.erase(queue0.begin() + i--);
+#endif
       }
     }
-    std::sort(outs.begin(), outs.end());
-    cm::append(outputs, outs);
+
+    if (!ent.incomplete) {
+      for (const auto& o : ent.outputs) {
+	fprintf(stderr, "\tI %s", o.first.c_str());
+	for (const auto& t : o.second) {
+	  fprintf(stderr, " %s", t->GetName().c_str());
+	}
+	fprintf(stderr, "\n");
+      }
+    }
+
+    fprintf(stderr, "d=%d O=%d/%d c=%d/%d\n",
+	    ent.ttts.size(),
+	    ent.szO, ent.depsO.size(),
+	    ent.szc, ent.depsc.size());
+
+    for (int i = 0; i < ent.szO; ++i) outsO.push_back(ent.depsO[i]);
+    for (int i = 0; i < ent.szc; ++i) outsO.push_back(ent.depsc[i]);
+    std::sort(outsO.begin(), outsO.end());
+    cm::append(outputs, outsO);
   }
 }
 

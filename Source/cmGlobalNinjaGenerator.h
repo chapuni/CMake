@@ -557,6 +557,44 @@ private:
   /// the local cache for calls to ConvertToNinjaPath
   mutable std::unordered_map<std::string, std::string> ConvertToNinjaPathCache;
 
+#if 1
+public:
+#if 0
+  struct OOO {
+    int szO, szc;
+    cmNinjaDeps depsO;
+    cmNinjaDeps depsc;
+    std::unordered_map<const cmGeneratorTarget*, std::string> outputs;
+  };
+#endif
+
+  struct OrderOnlyDepCacheEnt {
+    bool valid;
+    bool incomplete;
+    cmNinjaDeps SortedDepsO;
+    int szO, szc;
+    cmNinjaDeps depsO;
+    cmNinjaDeps depsc;
+#if 0
+    std::unordered_map<const cmGeneratorTarget*, OOO> depTargets;
+#endif
+    std::unordered_map<std::string, std::unordered_set<const cmGeneratorTarget*>> outputs;
+    std::vector<cmTargetDepend> ttts;
+  };
+
+  std::unordered_map<const cmGeneratorTarget*, OrderOnlyDepCacheEnt> OrderOnlyDepCache;
+
+  struct OO2Ent {
+    const cmGeneratorTarget* target;
+    std::unordered_set<std::string> appendices;
+  };
+
+  // cmake_object_order_depends_target_*
+  std::unordered_map<std::string, OO2Ent> OO2Cache;
+
+private:
+#endif
+
   std::string NinjaCommand;
   std::string NinjaVersion;
   bool NinjaSupportsConsolePool = false;
