@@ -570,7 +570,6 @@ public:
 
   struct OrderOnlyDepCacheEnt {
     bool valid;
-    bool incomplete;
     cmNinjaDeps SortedDepsO;
     int szO, szc;
     cmNinjaDeps depsO;

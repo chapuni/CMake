@@ -1301,6 +1301,7 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
       queueset0.insert(targetDepend);
     }
 
+    bool incomplete = false;
     int orig_size = queue0.size();
     for (int i = 0; i < queue0.size(); ++i) {
       const auto& targetDep = queue0[i];
@@ -1326,16 +1327,10 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
       if (tO.size() == 1 && tO[0] == ooname) {
 	if (this->OO2Cache.find(ooname) == this->OO2Cache.end()) {
 	  fprintf(stderr, "\tNOTFOUND<%s>\n", ooname.c_str());
-	  ent.incomplete = true;
-	  break;
+	  incomplete = true;
 	} else {
 	  const auto& oo2oo = this->OO2Cache[ooname];
 	  const auto& oo2ent = this->OrderOnlyDepCache[oo2oo.target];
-	  if (oo2ent.incomplete) {
-	    fprintf(stderr, "\tINCOMPLETE<%s>\n", ooname.c_str());
-	    ent.incomplete = true;
-	    break;
-	  }
 	  fprintf(stderr, "\too<%s>%d\n", ooname.c_str(), oo2ent.ttts.size());
 	  for (auto& s : oo2oo.appendices) {
 	    fprintf(stderr, "\t\tapp<%s>\n", s.c_str());
@@ -1348,10 +1343,9 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
 	      fprintf(stderr, "\t\tDUP<%s>\n", d->GetName().c_str());
 	    }
 	  }
+	  queue0.erase(queue0.begin() + i--);
 	}
-	queue0.erase(queue0.begin() + i--);
       } else if (targetDep->GetType() == cmStateEnums::UTILITY) {
-#if 1
 	std::vector<cmSourceFile const*> customCommands;
 	targetDep->GetCustomCommands(customCommands, tconfig);
 	int cusn = 0;
@@ -1374,40 +1368,10 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
 	  }
 	  queue0.erase(queue0.begin() + i--);
 	}
-#else
-	std::unordered_set<const cmGeneratorTarget*> queue;
-	queue.insert(targetDep);
-	for (auto I = queue.begin();
-	     I != queue.end();
-	     queue.erase(I), I = queue.begin())
-	  {
-	    const cmGeneratorTarget* x = *I;
-	    std::vector<cmSourceFile const*> customCommands;
-	    (*I)->GetCustomCommands(customCommands, tconfig);
-	    int cusn = 0;
-	    for (cmSourceFile const* sf : customCommands) {
-	      cmCustomCommand const* cc = sf->GetCustomCommand();
-	      cmCustomCommandGenerator ccg(*cc, tconfig, (*I)->GetLocalGenerator());
-	      if (ccg.GetNumberOfCommands() == 0) continue;
-	      for (auto& out : ccg.GetOutputs()) {
-		auto rout = this->ConvertToNinjaPath(out);
-		ent.outputs[rout].insert(*I);
-		++cusn;
-	      }
-	    }
-	    if (cusn == 0) {
-	      for (const auto& tdd : this->GetTargetDirectDepends(x)) {
-		queue.insert(tdd);
-	      }
-	      I = queue.find(x);
-	    }
-	  }
-	queue0.erase(queue0.begin() + i--);
-#endif
       }
     }
 
-    if (!ent.incomplete) {
+    if (!incomplete) {
       for (const auto& o : ent.outputs) {
 	fprintf(stderr, "\tI %s", o.first.c_str());
 	for (const auto& t : o.second) {
