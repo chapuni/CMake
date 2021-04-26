@@ -559,26 +559,28 @@ private:
 
 #if 1
 public:
-#if 0
+#if 1
   struct OOO {
-    int szO, szc;
-    cmNinjaDeps depsO;
-    cmNinjaDeps depsc;
-    std::unordered_map<const cmGeneratorTarget*, std::string> outputs;
+    const cmGeneratorTarget* target;
+    bool isCross;
+    bool hasDirs;
+    cmNinjaDeps outs;
+
+    OOO(const cmTargetDepend& td) : target(td), isCross(td.IsCross()), hasDirs(false) {}
   };
 #endif
 
   struct OrderOnlyDepCacheEnt {
     bool valid;
-    cmNinjaDeps SortedDepsO;
+    cmNinjaDeps SortedDeps;
+#if 0
     int szO, szc;
     cmNinjaDeps depsO;
     cmNinjaDeps depsc;
-#if 0
-    std::unordered_map<const cmGeneratorTarget*, OOO> depTargets;
 #endif
-    std::unordered_map<std::string, std::unordered_set<const cmGeneratorTarget*>> outputs;
-    std::vector<cmTargetDepend> ttts;
+    std::unordered_map<std::string, std::unordered_set<const cmGeneratorTarget*>> dirs;
+    std::vector<OOO> ttts;
+    //std::vector<cmTargetDepend> ttts;
   };
 
   std::unordered_map<const cmGeneratorTarget*, OrderOnlyDepCacheEnt> OrderOnlyDepCache;

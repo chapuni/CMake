@@ -1328,7 +1328,66 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
                    this->MapToNinjaPath());
   }
 
+#if 1
+  std::string ooname = this->OrderDependsTargetForTarget(config);
+  const auto& oo2ent = this->GetGlobalGenerator()->OO2Cache[ooname];
+  const auto& ooent = this->GetGlobalGenerator()->OrderOnlyDepCache[oo2ent.target];
+  if (ooent.dirs.size() > 0) {
+    std::unordered_set<const cmGeneratorTarget*> hits;
+
+    std::string xxx = this->ComputeIncludes(source, "RAW", config);
+    const char *p = xxx.c_str();
+    const char *e = p + xxx.size();
+    while (p < e) {
+      const char *p0 = std::strchr(p, ' ');
+      if (p0 == NULL) p0 = e;
+      std::string include_dir(p, p0);
+      p = p0 + 1;
+      for (const auto& outs : ooent.dirs) {
+	if (cmSystemTools::IsSubDirectory(outs.first, include_dir)) {
+	  for (const auto ddt : outs.second) {
+#if 1
+	    if (hits.find(ddt) == hits.end()) {
+	      fprintf(stderr, "\thit<%s><%s>%s\n", include_dir.c_str(), outs.first.c_str(), ddt->GetName().c_str());
+	    }
+#endif
+	    hits.insert(ddt);
+	  }
+	}
+      }
+    }
+
+    std::unordered_set<std::string> oout;
+    int hazure = 0;
+    for (const auto& ooo : ooent.ttts) {
+      if (hits.find(ooo.target) == hits.end()) {
+	for (const auto& o : ooo.outs) oout.insert(o);
+	if (ooo.hasDirs) {
+	  ++hazure;
+#if 1
+	  fprintf(stderr, "\t%s:hazure<%s>\n", this->GetTargetName().c_str(), ooo.target->GetName().c_str());
+#endif
+	}
+      }
+    }
+
+    if (hazure > 0) {
+      objBuild.OrderOnlyDeps.push_back(this->OrderDependsTargetForTarget(config));
+#if 1
+      for (const auto t : hits) {
+	fprintf(stderr, "\th - %s\n", t->GetName().c_str());
+      }
+#endif
+    } else {
+      cm::append(objBuild.OrderOnlyDeps, oout);
+      objBuild.OrderOnlyDeps.push_back("DYNDEP_" + this->GetTargetName());
+    }
+  } else {
+    objBuild.OrderOnlyDeps.push_back(this->OrderDependsTargetForTarget(config));
+  }
+#else
   objBuild.OrderOnlyDeps.push_back(this->OrderDependsTargetForTarget(config));
+#endif
 
   // If the source file is GENERATED and does not have a custom command
   // (either attached to this source file or another one), assume that one of
