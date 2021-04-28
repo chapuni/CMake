@@ -566,7 +566,7 @@ public:
     bool hasDirs;
     cmNinjaDeps outs;
 
-    OOO(const cmTargetDepend& td) : target(td), isCross(td.IsCross()), hasDirs(false) {}
+    OOO(const cmTargetDepend& td) : target(td), isCross(td.IsCross()), hasDirs(false), outs() {}
   };
 #endif
 

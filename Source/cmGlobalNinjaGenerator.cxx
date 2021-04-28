@@ -1289,14 +1289,19 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
 
     ent = OrderOnlyDepCacheEnt();
 
-    fprintf(stderr, "<%s:>\n", target->GetName().c_str());
-
     //std::vector<cmTargetDepend> queue0;
     auto& queue0 = ent.ttts;
     std::unordered_set<const cmGeneratorTarget*> queueset0;
     for (const auto& targetDep : this->GetTargetDirectDepends(target)) {
-      queue0.emplace_back(targetDep);
-      queueset0.insert(targetDep);
+      if (queueset0.find(targetDep) == queueset0.end()) {
+	queue0.emplace_back(targetDep);
+	queueset0.insert(targetDep);
+      }
+    }
+
+    fprintf(stderr, "<%s:>%d\n", target->GetName().c_str(), queue0.size());
+    for (const auto& x : queue0) {
+      fprintf(stderr, "\t<%s>\n", x.target->GetName().c_str());
     }
 
     bool incomplete = false;
@@ -1310,6 +1315,13 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
       }
 
       std::string tconfig = (oooent.isCross ? fileConfig : config);
+      std::string ooname = this->OrderDependsTargetForTarget(targetDep, tconfig);
+
+      for (int j = 0; j < oooent.outs.size(); ++j) {
+	if (oooent.outs[j] == ooname) {
+	  oooent.outs.erase(oooent.outs.begin() + j--);
+	}
+      }
 
       this->AppendTargetOutputs(targetDep, oooent.outs, tconfig, DependOnTargetOrdering);
       int tos = oooent.outs.size();
@@ -1320,7 +1332,6 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
 	--orig_size;
       }
 
-      std::string ooname = this->OrderDependsTargetForTarget(targetDep, tconfig);
       if (tos == 1 && oooent.outs[0] == ooname) {
 	if (this->OO2Cache.find(ooname) == this->OO2Cache.end()) {
 	  fprintf(stderr, "\tNOTFOUND<%s>\n", ooname.c_str());
@@ -1328,7 +1339,7 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
 	} else {
 	  const auto& oo2oo = this->OO2Cache[ooname];
 	  const auto& oo2ent = this->OrderOnlyDepCache[oo2oo.target];
-	  //fprintf(stderr, "\too<%s>%d\n", ooname.c_str(), oo2ent.ttts.size());
+	  fprintf(stderr, "\too<%s>%d\n", ooname.c_str(), oo2ent.ttts.size());
 	  for (auto& s : oo2oo.appendices) {
 	    fprintf(stderr, "\t<%s>\tapp<%s>\n", ooname.c_str(), s.c_str());
 	  }
@@ -1336,10 +1347,12 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
 	    if (queueset0.find(d.target) == queueset0.end()) {
 	      queue0.push_back(d);
 	      queueset0.insert(d.target);
+	      fprintf(stderr, "\t\tADD<%s>%d %d\n", d.target->GetName().c_str(), d.outs.size(), queue0[queue0.size() - 1].outs.size());
 	    } else {
 	      //fprintf(stderr, "\t\tDUP<%s>\n", d->GetName().c_str());
 	    }
 	  }
+	  fprintf(stderr, "\tFOUND<%d.%s>%d(%s)\n", i, queue0[i].target->GetName().c_str(), oooent.outs.size(), oooent.outs[0].c_str());
 	  queue0.erase(queue0.begin() + i--);
 	}
       } else if (targetDep->GetType() == cmStateEnums::UTILITY) {
@@ -1354,7 +1367,7 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
 	    auto rout = this->ConvertToNinjaPath(out);
 	    rout =  cmSystemTools::GetFilenamePath(rout);
 	    ent.dirs[rout].insert(targetDep);
-	    if (!oooent.hasDirs) fprintf(stderr, "<%s> hasdirs\n", targetDep->GetName().c_str());
+	    if (!oooent.hasDirs) fprintf(stderr, "\t<%s> hasdirs\n", targetDep->GetName().c_str());
 	    oooent.hasDirs = true;
 	    ++cusn;
 	  }
@@ -1364,9 +1377,15 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
 	    if (queueset0.find(tdd) == queueset0.end()) {
 	      queue0.emplace_back(tdd);
 	      queueset0.insert(tdd);
+	      fprintf(stderr, "\t\tADD<%s>%d\n", tdd->GetName().c_str(), queue0[queue0.size() - 1].outs.size());
 	    }
 	  }
 	  queue0.erase(queue0.begin() + i--);
+	}
+      } else {
+	fprintf(stderr, "\tOTHERS<%s>%d\n", targetDep->GetName().c_str(), tos);
+	for (const auto& o : oooent.outs) {
+	  fprintf(stderr, "\t\t<%s>\n", o.c_str());
 	}
       }
     }

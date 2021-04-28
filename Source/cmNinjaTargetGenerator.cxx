@@ -1332,6 +1332,7 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
   std::string ooname = this->OrderDependsTargetForTarget(config);
   const auto& oo2ent = this->GetGlobalGenerator()->OO2Cache[ooname];
   const auto& ooent = this->GetGlobalGenerator()->OrderOnlyDepCache[oo2ent.target];
+  fprintf(stderr, "<%s:>dirs=%d\n", ooname.c_str(), ooent.dirs.size());
   if (ooent.dirs.size() > 0) {
     std::unordered_set<const cmGeneratorTarget*> hits;
 
@@ -1361,7 +1362,10 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
     int hazure = 0;
     for (const auto& ooo : ooent.ttts) {
       if (hits.find(ooo.target) == hits.end()) {
-	for (const auto& o : ooo.outs) oout.insert(o);
+	//oout.insert("<<<" + ooo.target->GetName() + ">>>");
+	for (const auto& o : ooo.outs) {
+	  oout.insert(o);
+	}
 	if (ooo.hasDirs) {
 	  ++hazure;
 #if 1
@@ -1371,16 +1375,14 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
       }
     }
 
-    if (hazure > 0) {
-      objBuild.OrderOnlyDeps.push_back(this->OrderDependsTargetForTarget(config));
-#if 1
-      for (const auto t : hits) {
-	fprintf(stderr, "\th - %s\n", t->GetName().c_str());
-      }
-#endif
-    } else {
+    if (!hits.empty()) {
+      //objBuild.OrderOnlyDeps.push_back("KOKOKARA");
       cm::append(objBuild.OrderOnlyDeps, oout);
-      objBuild.OrderOnlyDeps.push_back("DYNDEP_" + this->GetTargetName());
+      std::string scanner_name = "prescan." + sourceFileName + ">>>";
+      objBuild.OrderOnlyDeps.push_back("<<<dyndep");
+      objBuild.OrderOnlyDeps.push_back(scanner_name);
+    } else {
+      objBuild.OrderOnlyDeps.push_back(this->OrderDependsTargetForTarget(config));
     }
   } else {
     objBuild.OrderOnlyDeps.push_back(this->OrderDependsTargetForTarget(config));
