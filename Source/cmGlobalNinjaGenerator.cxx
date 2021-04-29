@@ -1365,8 +1365,8 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
 	  if (ccg.GetNumberOfCommands() == 0) continue;
 	  for (auto& out : ccg.GetOutputs()) {
 	    auto rout = this->ConvertToNinjaPath(out);
-	    rout =  cmSystemTools::GetFilenamePath(rout);
-	    ent.dirs[rout].insert(targetDep);
+	    //rout =  cmSystemTools::GetFilenamePath(rout);
+	    ent.files[rout].insert(targetDep);
 	    if (!oooent.hasDirs) fprintf(stderr, "\t<%s> hasdirs\n", targetDep->GetName().c_str());
 	    oooent.hasDirs = true;
 	    ++cusn;
@@ -1391,7 +1391,7 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
     }
 
     if (!incomplete) {
-      for (const auto& o : ent.dirs) {
+      for (const auto& o : ent.files) {
 	fprintf(stderr, "\tI %s %d", o.first.c_str(), cmSystemTools::IsSubDirectory(o.first, "include"));
 	for (const auto& t : o.second) {
 	  fprintf(stderr, " %s", t->GetName().c_str());
@@ -1401,7 +1401,7 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
     }
 
     if (incomplete) {
-      ent.dirs.clear();
+      ent.files.clear();
     }
 
     fprintf(stderr, "d=%d\n",

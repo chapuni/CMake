@@ -25,6 +25,28 @@ class cmLocalNinjaGenerator;
 class cmMakefile;
 class cmSourceFile;
 
+struct DDD {
+  std::string scanner_name;
+
+  struct EEE {
+    std::string source_fn;
+    std::string target_fn;
+
+    EEE(const std::string& src,
+	const std::string& tgt)
+      : source_fn(src),
+	target_fn(tgt)
+    {}
+  };
+
+  std::vector<EEE> files;
+
+  std::unordered_set<std::string> vfiles;
+  std::unordered_set<std::string> includes_args;
+
+  DDD() = default;
+};
+
 class cmNinjaTargetGenerator : public cmCommonTargetGenerator
 {
 public:
@@ -150,6 +172,7 @@ protected:
                                   bool firstForConfig);
   void WriteObjectBuildStatement(cmSourceFile const* source,
                                  const std::string& config,
+                                 DDD& ddd,
                                  const std::string& fileConfig,
                                  bool firstForConfig);
   void WriteTargetDependInfo(std::string const& lang,

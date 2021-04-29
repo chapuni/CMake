@@ -578,7 +578,7 @@ public:
     cmNinjaDeps depsO;
     cmNinjaDeps depsc;
 #endif
-    std::unordered_map<std::string, std::unordered_set<const cmGeneratorTarget*>> dirs;
+    std::unordered_map<std::string, std::unordered_set<const cmGeneratorTarget*>> files;
     std::vector<OOO> ttts;
     //std::vector<cmTargetDepend> ttts;
   };
