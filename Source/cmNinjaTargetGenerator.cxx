@@ -1383,13 +1383,15 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
       if (p0 == NULL) p0 = e;
       std::string include_dir(p, p0);
       p = p0 + 1;
+#if 0
       fprintf(stderr, "\tINC<%s>\n", include_dir.c_str());
+#endif
       for (const auto& outs : ooent.files) {
 	auto outdir = cmSystemTools::GetFilenamePath(outs.first);
 	if (cmSystemTools::IsSubDirectory(outs.first, include_dir)) {
 	  vfiles.insert(outs.first);
 	  for (const auto ddt : outs.second) {
-#if 1
+#if 0
 	    if (hits.find(ddt) == hits.end()) {
 	      fprintf(stderr, "\thit<%s><%s>%s\n", include_dir.c_str(), outs.first.c_str(), ddt->GetName().c_str());
 	    }
@@ -1397,7 +1399,9 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
 	    hits.insert(ddt);
 	  }
 	} else {
+#if 0
 	  fprintf(stderr, "\tINC<%s>NOTHIT<%s><%s>\n", include_dir.c_str(), outdir.c_str(), outs.first.c_str());
+#endif
 	}
       }
     }
