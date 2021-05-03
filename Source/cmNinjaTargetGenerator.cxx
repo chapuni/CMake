@@ -1030,8 +1030,8 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatements(
     {
       auto& xxx = this->GetGlobalGenerator()->OrderOnlyDepCache[this->OrderDependsTargetForTarget(config)];
       for (; ooi < orderOnlyDeps.size(); ++ooi) {
-	xxx.extra.insert(orderOnlyDeps[ooi]);
-	fprintf(stderr, "\t* %s %s\n", this->OrderDependsTargetForTarget(config).c_str(), orderOnlyDeps[ooi].c_str());
+        xxx.extra.insert(orderOnlyDeps[ooi]);
+        fprintf(stderr, "\t* %s %s\n", this->OrderDependsTargetForTarget(config).c_str(), orderOnlyDeps[ooi].c_str());
       }
     }
 #endif
@@ -1068,37 +1068,72 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatements(
     }
 
     if (!ddd.files.empty()) {
+      std::string path =
+        cmStrCat(this->Makefile->GetCurrentBinaryDirectory(), '/',
+                 this->LocalGenerator->GetTargetDirectory(this->GeneratorTarget),
+                 this->GetGlobalGenerator()->ConfigDirectory(config), '/',
+                 "cdbx.json");
+
       cmNinjaBuild scanner("CUSTOM_COMMAND");
 
       auto& cmd = scanner.Variables["COMMAND"];
-      cmd = this->LocalGenerator->GetSourceDirectory() + "/scan_dyndep";
-      // FIXM: restat?
-
       for (const auto& f : ddd.files) {
-	scanner.ExplicitDeps.push_back(f.source_fn);
-	cmd += " " + f.source_fn + " " + f.target_fn;
+        scanner.ExplicitDeps.push_back(f.source_fn);
+        cmd += " " + f.source_fn + " " + f.target_fn;
       }
 
       scanner.Outputs.push_back(ddd.scanner_name);
+      if (ddd.includes_args.size() != 1 || ddd.defines_args.size() != 1 || ddd.flags_args.size() != 1) {
+        scanner.Comment = cmStrCat("XXX: flags is not identical(", ddd.includes_args.size(), ")");
+      }
+#if 1
+      cmd = cmStrCat("/home/chapuni/llvm/install/2libcxx/bin/clang-scan-deps --compilation-database=", path, " --mode=preprocess-minimized-sources -j=1 --reuse-filemanager --skip-excluded-pp-ranges --format=ninja > ", ddd.scanner_name);
+#else
+      cmd = this->LocalGenerator->GetSourceDirectory() + "/scan_dyndep";
+      // FIXM: restat?
+
       cmd += " -o" + ddd.scanner_name;
 
-      if (ddd.includes_args.size() == 1) {
-	cmd += " " + *ddd.includes_args.begin();
-      } else {
-	scanner.Comment = cmStrCat("XXX: INCLUDES is not identical(", ddd.includes_args.size(), ")");
-      }
+      cmd += " " + *ddd.includes_args.begin();
 
       for (const auto& f : ddd.vfiles) {
-	cmd += " -f" + f;
+        cmd += " -f" + f;
       }
 
       std::string depfile = ddd.scanner_name + ".d";
       scanner.Variables["depfile"] = depfile;
       cmd += " -d" + depfile;
+#endif
 
       scanner.Variables["DESC"] = cmStrCat("Scanning deps in ", this->GetTargetName());
 
       this->GetGlobalGenerator()->WriteBuild(this->GetImplFileStream(fileConfig), scanner);
+
+      Json::Value cdbx(Json::objectValue);
+      cdbx["vfiles"] = Json::objectValue;
+
+#if 0
+      for (auto& f : ddd.files) {
+        Json::Value ent(Json::objectValue);
+        auto& cu = cdbx.append(Json::objectValue);
+        cu["directory"] = this->Makefile->GetHomeOutputDirectory();
+        cu["command"] = ddd.cmdlines[f.target_fn];
+        cu["file"] = f.source_fn;
+      }
+#endif
+
+      Json::Value cdb(Json::arrayValue);
+      bool vemit = false;
+      for (auto& f : ddd.files) {
+        Json::Value ent(Json::objectValue);
+        auto& cu = cdb.append(Json::objectValue);
+        cu["directory"] = this->Makefile->GetHomeOutputDirectory();
+        cu["command"] = ddd.cmdlines[f.target_fn];
+        cu["file"] = f.source_fn;
+      }
+
+      cmGeneratedFileStream cdbxf(path);
+      cdbxf << cdb;
     }
   }
 
@@ -1302,7 +1337,7 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
     }
   }
 
-  this->ExportObjectCompileCommand(
+  auto cmdline = this->ExportObjectCompileCommand(
     language, sourceFileName, objectDir, objectFileName, objectFileDir,
     vars["FLAGS"], vars["DEFINES"], vars["INCLUDES"]);
 
@@ -1367,6 +1402,7 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
   }
 
 #if 1
+  bool hit = false;
   std::string ooname = this->OrderDependsTargetForTarget(config);
   const auto& oo2ent = this->GetGlobalGenerator()->OO2Cache[ooname];
   const auto& ooent = this->GetGlobalGenerator()->OrderOnlyDepCache[oo2ent.target];
@@ -1387,22 +1423,22 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
       fprintf(stderr, "\tINC<%s>\n", include_dir.c_str());
 #endif
       for (const auto& outs : ooent.files) {
-	auto outdir = cmSystemTools::GetFilenamePath(outs.first);
-	if (cmSystemTools::IsSubDirectory(outs.first, include_dir)) {
-	  vfiles.insert(outs.first);
-	  for (const auto ddt : outs.second) {
+        auto outdir = cmSystemTools::GetFilenamePath(outs.first);
+        if (cmSystemTools::IsSubDirectory(outs.first, include_dir)) {
+          vfiles.insert(outs.first);
+          for (const auto ddt : outs.second) {
 #if 0
-	    if (hits.find(ddt) == hits.end()) {
-	      fprintf(stderr, "\thit<%s><%s>%s\n", include_dir.c_str(), outs.first.c_str(), ddt->GetName().c_str());
-	    }
+            if (hits.find(ddt) == hits.end()) {
+              fprintf(stderr, "\thit<%s><%s>%s\n", include_dir.c_str(), outs.first.c_str(), ddt->GetName().c_str());
+            }
 #endif
-	    hits.insert(ddt);
-	  }
-	} else {
+            hits.insert(ddt);
+          }
+        } else {
 #if 0
-	  fprintf(stderr, "\tINC<%s>NOTHIT<%s><%s>\n", include_dir.c_str(), outdir.c_str(), outs.first.c_str());
+          fprintf(stderr, "\tINC<%s>NOTHIT<%s><%s>\n", include_dir.c_str(), outdir.c_str(), outs.first.c_str());
 #endif
-	}
+        }
       }
     }
 
@@ -1410,33 +1446,31 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
     int hazure = 0;
     for (const auto& ooo : ooent.ttts) {
       if (hits.find(ooo.target) == hits.end()) {
-	//oout.insert("<<<" + ooo.target->GetName() + ">>>");
-	for (const auto& o : ooo.outs) {
-	  oout.insert(o);
-	}
-	if (ooo.hasDirs) {
-	  ++hazure;
+        //oout.insert("<<<" + ooo.target->GetName() + ">>>");
+        for (const auto& o : ooo.outs) {
+          oout.insert(o);
+        }
+        if (ooo.hasDirs) {
+          ++hazure;
 #if 1
-	  fprintf(stderr, "\t%s:hazure<%s>\n", this->GetTargetName().c_str(), ooo.target->GetName().c_str());
+          fprintf(stderr, "\t%s:hazure<%s>\n", this->GetTargetName().c_str(), ooo.target->GetName().c_str());
 #endif
-	}
+        }
       }
     }
 
     if (!hits.empty()) {
       //objBuild.OrderOnlyDeps.push_back("KOKOKARA");
+      hit = true;
       cm::append(objBuild.OrderOnlyDeps, oout);
-#if 1
       ddd.files.emplace_back(sourceFileName, objectFileName);
+      ddd.defines_args.insert(vars["DEFINES"]);
+      ddd.flags_args.insert(vars["FLAGS"]);
       ddd.includes_args.insert(vars["INCLUDES"]);
+      ddd.cmdlines[objectFileName] = cmdline;
       ddd.vfiles = std::move(vfiles);
       objBuild.OrderOnlyDeps.push_back(ddd.scanner_name);
       vars["dyndep"] = ddd.scanner_name;
-#else
-      std::string scanner_name = "prescan." + sourceFileName + ">>>";
-      objBuild.OrderOnlyDeps.push_back("<<<dyndep");
-      objBuild.OrderOnlyDeps.push_back(scanner_name);
-#endif
     } else {
       objBuild.OrderOnlyDeps.push_back(this->OrderDependsTargetForTarget(config));
     }
@@ -1750,14 +1784,14 @@ void cmNinjaTargetGenerator::EmitSwiftDependencyInfo(
   this->Configs[config].SwiftOutputMap[sourceFilePath] = entry;
 }
 
-void cmNinjaTargetGenerator::ExportObjectCompileCommand(
+std::string cmNinjaTargetGenerator::ExportObjectCompileCommand(
   std::string const& language, std::string const& sourceFileName,
   std::string const& objectDir, std::string const& objectFileName,
   std::string const& objectFileDir, std::string const& flags,
   std::string const& defines, std::string const& includes)
 {
   if (!this->GeneratorTarget->GetPropertyAsBool("EXPORT_COMPILE_COMMANDS")) {
-    return;
+    return std::string();
   }
 
   cmRulePlaceholderExpander::RuleVariables compileObjectVars;
@@ -1820,6 +1854,8 @@ void cmNinjaTargetGenerator::ExportObjectCompileCommand(
     this->GetLocalGenerator()->BuildCommandLine(compileCmds);
 
   this->GetGlobalGenerator()->AddCXXCompileCommand(cmdLine, sourceFileName);
+
+  return cmdLine;
 }
 
 void cmNinjaTargetGenerator::AdditionalCleanFiles(const std::string& config)

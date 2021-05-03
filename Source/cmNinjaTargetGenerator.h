@@ -41,7 +41,11 @@ struct DDD {
 
   std::vector<EEE> files;
 
+  std::unordered_map<std::string, std::string> cmdlines;
+
   std::unordered_set<std::string> vfiles;
+  std::unordered_set<std::string> defines_args;
+  std::unordered_set<std::string> flags_args;
   std::unordered_set<std::string> includes_args;
 
   DDD() = default;
@@ -181,7 +185,7 @@ protected:
   void EmitSwiftDependencyInfo(cmSourceFile const* source,
                                const std::string& config);
 
-  void ExportObjectCompileCommand(
+  std::string ExportObjectCompileCommand(
     std::string const& language, std::string const& sourceFileName,
     std::string const& objectDir, std::string const& objectFileName,
     std::string const& objectFileDir, std::string const& flags,
