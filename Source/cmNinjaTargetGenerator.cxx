@@ -1406,10 +1406,10 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
   std::string ooname = this->OrderDependsTargetForTarget(config);
   const auto& oo2ent = this->GetGlobalGenerator()->OO2Cache[ooname];
   const auto& ooent = this->GetGlobalGenerator()->OrderOnlyDepCache[oo2ent.target];
-  fprintf(stderr, "<%s:>dirs=%d\n", ooname.c_str(), ooent.files.size());
+  fprintf(stderr, "<%s:>dirs=%d apps=%d\n", ooname.c_str(), ooent.files.size(), oo2ent.appendices.size());
   if (ooent.files.size() > 0) {
     std::unordered_set<const cmGeneratorTarget*> hits;
-    std::unordered_set<std::string> vfiles;
+    std::unordered_set<std::string> vfiles = oo2ent.appendices;
 
     std::string xxx = this->ComputeIncludes(source, "RAW", config);
     const char *p = xxx.c_str();
