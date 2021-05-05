@@ -1068,11 +1068,12 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatements(
     }
 
     if (!ddd.files.empty()) {
-      std::string path =
+      std::string cdir =
         cmStrCat(this->Makefile->GetCurrentBinaryDirectory(), '/',
                  this->LocalGenerator->GetTargetDirectory(this->GeneratorTarget),
-                 this->GetGlobalGenerator()->ConfigDirectory(config), '/',
-                 "cdbx.json");
+                 this->GetGlobalGenerator()->ConfigDirectory(config), '/');
+      std::string path = cmStrCat(cdir, "cdb.json");
+      std::string pathx = cmStrCat(cdir, "cdbx.json");
 
       cmNinjaBuild scanner("CUSTOM_COMMAND");
 
@@ -1087,7 +1088,9 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatements(
         scanner.Comment = cmStrCat("XXX: flags is not identical(", ddd.includes_args.size(), ")");
       }
 #if 1
-      cmd = cmStrCat("/home/chapuni/llvm/install/2libcxx/bin/clang-scan-deps --compilation-database=", path, " --mode=preprocess-minimized-sources -j=1 --reuse-filemanager --skip-excluded-pp-ranges --format=ninja > ", ddd.scanner_name);
+      cmd = cmStrCat("/home/chapuni/llvm/install/2libcxx/bin/clang-scan-deps --compilation-database=", path,
+                     " --cdbx=", pathx,
+                     " --mode=preprocess-minimized-sources -j=1 --reuse-filemanager --format=ninja > ", ddd.scanner_name);
 #else
       cmd = this->LocalGenerator->GetSourceDirectory() + "/scan_dyndep";
       // FIXM: restat?
@@ -1109,17 +1112,31 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatements(
 
       this->GetGlobalGenerator()->WriteBuild(this->GetImplFileStream(fileConfig), scanner);
 
+#if 1
       Json::Value cdbx(Json::objectValue);
-      cdbx["vfiles"] = Json::objectValue;
 
-#if 0
-      for (auto& f : ddd.files) {
-        Json::Value ent(Json::objectValue);
-        auto& cu = cdbx.append(Json::objectValue);
-        cu["directory"] = this->Makefile->GetHomeOutputDirectory();
-        cu["command"] = ddd.cmdlines[f.target_fn];
-        cu["file"] = f.source_fn;
+      // CMAKE_BINARY_DIR from this file
+      cdbx["build_root"] = cmSystemTools::RelativePath(cdir, this->Makefile->GetHomeOutputDirectory());
+
+      // List of vfiles
+      auto& vfiles = cdbx["vfiles"] = Json::arrayValue;
+      std::set<std::string> vfiles_sorted;
+      vfiles_sorted.insert(ddd.vfiles.cbegin(), ddd.vfiles.cend());
+      for (auto& f : vfiles_sorted) {
+        vfiles.append(f);
       }
+
+      cdbx["defines_args"] = *ddd.defines_args.begin();
+      cdbx["flags_args"] = *ddd.flags_args.begin();
+      cdbx["include_args"] = *ddd.includes_args.begin();
+
+      auto& cdbx_targets = cdbx["targets"] = Json::objectValue;
+      for (const auto& ts : ddd.files) {
+        cdbx_targets[ts.target_fn] = ts.source_fn;
+      }
+
+      cmGeneratedFileStream cdbxf(pathx);
+      cdbxf << cdbx;
 #endif
 
       Json::Value cdb(Json::arrayValue);
@@ -1132,8 +1149,8 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatements(
         cu["file"] = f.source_fn;
       }
 
-      cmGeneratedFileStream cdbxf(path);
-      cdbxf << cdb;
+      cmGeneratedFileStream cdbf(path);
+      cdbf << cdb;
     }
   }
 
