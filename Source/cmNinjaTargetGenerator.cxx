@@ -1112,7 +1112,19 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatements(
 
       this->GetGlobalGenerator()->WriteBuild(this->GetImplFileStream(fileConfig), scanner);
 
-#if 1
+      Json::Value cdb(Json::arrayValue);
+      bool vemit = false;
+      for (auto& f : ddd.files) {
+        Json::Value ent(Json::objectValue);
+        auto& cu = cdb.append(Json::objectValue);
+        cu["directory"] = this->Makefile->GetHomeOutputDirectory();
+        cu["command"] = ddd.cmdlines[f.target_fn];
+        cu["file"] = f.source_fn;
+      }
+
+      cmGeneratedFileStream cdbf(path);
+      cdbf << cdb;
+
       Json::Value cdbx(Json::objectValue);
 
       // CMAKE_BINARY_DIR from this file
@@ -1137,20 +1149,6 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatements(
 
       cmGeneratedFileStream cdbxf(pathx);
       cdbxf << cdbx;
-#endif
-
-      Json::Value cdb(Json::arrayValue);
-      bool vemit = false;
-      for (auto& f : ddd.files) {
-        Json::Value ent(Json::objectValue);
-        auto& cu = cdb.append(Json::objectValue);
-        cu["directory"] = this->Makefile->GetHomeOutputDirectory();
-        cu["command"] = ddd.cmdlines[f.target_fn];
-        cu["file"] = f.source_fn;
-      }
-
-      cmGeneratedFileStream cdbf(path);
-      cdbf << cdb;
     }
   }
 
