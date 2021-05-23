@@ -1770,10 +1770,16 @@ void cmGlobalGenerator::CreateGeneratorTargets(
   std::map<cmTarget*, cmGeneratorTarget*> const& importedMap)
 {
   if (targetTypes == AllTargets) {
+#if 1
+    for (auto& target : mf->GetOrderedTargets()) {
+      lg->AddGeneratorTarget(cm::make_unique<cmGeneratorTarget>(target, lg));
+    }
+#else
     for (auto& target : mf->GetTargets()) {
       cmTarget* t = &target.second;
       lg->AddGeneratorTarget(cm::make_unique<cmGeneratorTarget>(t, lg));
     }
+#endif
   }
 
   for (cmTarget* t : mf->GetImportedTargets()) {
