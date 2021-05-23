@@ -1349,14 +1349,14 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
               queueset0.insert(d.target);
               fprintf(stderr, "\t\tADD<%s>%d %d\n", d.target->GetName().c_str(), d.outs.size(), queue0[queue0.size() - 1].outs.size());
             } else {
-              //fprintf(stderr, "\t\tDUP<%s>\n", d->GetName().c_str());
+              //fprintf(stderr, "\t\tDUP<%s>\n", d.target->GetName().c_str());
             }
           }
-          fprintf(stderr, "\tFOUND<%d.%s>%d(%s)\n", i, queue0[i].target->GetName().c_str(), oooent.outs.size(), (oooent.outs.size() >= 1 ? oooent.outs[0].c_str() : "(nil)"));
+          fprintf(stderr, "\tFOUND<%d.%s>%d(%s)\n", i, queue0[i].target->GetName().c_str(), queue0[i].outs.size(), (queue0[i].outs.size() >= 1 ? queue0[i].outs[0].c_str() : "(nil)"));
 #if 0
           fprintf(stderr, "\tFOUND<%d.%s>\n", i, queue0[i].target->GetName().c_str());
-          fprintf(stderr, "\t\%d\n", oooent.outs.size());
-          fprintf(stderr, "\t\(%s)\n", oooent.outs[0].c_str());
+          fprintf(stderr, "\t\%d\n", queue0[i].outs.size());
+          fprintf(stderr, "\t\(%s)\n", queue0[i].outs[0].c_str());
 #endif
           queue0.erase(queue0.begin() + i--);
         }
@@ -1372,8 +1372,8 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
             auto rout = this->ConvertToNinjaPath(out);
             //rout =  cmSystemTools::GetFilenamePath(rout);
             ent.files[rout].insert(targetDep);
-            if (!oooent.hasDirs) fprintf(stderr, "\t<%s> hasdirs\n", targetDep->GetName().c_str());
-            oooent.hasDirs = true;
+            if (!queue0[i].hasDirs) fprintf(stderr, "\t<%s> hasdirs\n", targetDep->GetName().c_str());
+            queue0[i].hasDirs = true;
             ++cusn;
           }
         }
@@ -1389,7 +1389,7 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
         }
       } else {
         fprintf(stderr, "\tOTHERS<%s>%d\n", targetDep->GetName().c_str(), tos);
-        for (const auto& o : oooent.outs) {
+        for (const auto& o : queue0[i].outs) {
           fprintf(stderr, "\t\t<%s>\n", o.c_str());
         }
       }
