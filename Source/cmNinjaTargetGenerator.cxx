@@ -1061,8 +1061,12 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatements(
     std::vector<cmSourceFile const*> objectSources;
     this->GeneratorTarget->GetObjectSources(objectSources, config);
 
+
     DDD ddd;
-    ddd.scanner_name = GetDyndepFilePath("CXX", config);
+    std::string prescanner_cmd = this->Makefile->GetSafeDefinition("CMAKE_CXX_EXPERIMENTAL_PRESCANNER");
+    if (prescanner_cmd != "") {
+      ddd.scanner_name = GetDyndepFilePath("CXX", config);
+    }
     for (cmSourceFile const* sf : objectSources) {
       this->WriteObjectBuildStatement(sf, config, ddd, fileConfig, firstForConfig);
     }
@@ -1087,26 +1091,13 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatements(
       if (ddd.includes_args.size() != 1 || ddd.defines_args.size() != 1 || ddd.flags_args.size() != 1) {
         scanner.Comment = cmStrCat("XXX: flags is not identical(", ddd.includes_args.size(), ")");
       }
-#if 1
-      cmd = cmStrCat("/home/chapuni/llvm/install/2libcxx/bin/clang-scan-deps --compilation-database=", path,
+
+      fprintf(stderr, "<%s>\n", prescanner_cmd.c_str());
+      cmd = cmStrCat(prescanner_cmd,
+                     " --compilation-database=", path,
                      " --cdbx=", pathx,
-                     " --mode=preprocess-minimized-sources -j=1 --reuse-filemanager --format=ninja > ", ddd.scanner_name);
-#else
-      cmd = this->LocalGenerator->GetSourceDirectory() + "/scan_dyndep";
-      // FIXM: restat?
-
-      cmd += " -o" + ddd.scanner_name;
-
-      cmd += " " + *ddd.includes_args.begin();
-
-      for (const auto& f : ddd.vfiles) {
-        cmd += " -f" + f;
-      }
-
-      std::string depfile = ddd.scanner_name + ".d";
-      scanner.Variables["depfile"] = depfile;
-      cmd += " -d" + depfile;
-#endif
+                     " > ",
+                     ddd.scanner_name);
 
       scanner.Variables["DESC"] = cmStrCat("Scanning deps in ", this->GetTargetName());
 
@@ -1417,14 +1408,16 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
   }
 
 #if 1
+  bool need = false;
   bool hit = false;
   std::string ooname = this->OrderDependsTargetForTarget(config);
   const auto& oo2ent = this->GetGlobalGenerator()->OO2Cache[ooname];
   const auto& ooent = this->GetGlobalGenerator()->OrderOnlyDepCache[oo2ent.target];
+  std::unordered_set<std::string> vfiles;
   fprintf(stderr, "<%s:>dirs=%d apps=%d\n", ooname.c_str(), ooent.files.size(), oo2ent.appendices.size());
-  if (ooent.files.size() > 0) {
+  if (ddd.scanner_name != "" && ooent.files.size() > 0) {
     std::unordered_set<const cmGeneratorTarget*> hits;
-    std::unordered_set<std::string> vfiles = oo2ent.appendices;
+    vfiles = oo2ent.appendices;
 
     std::string xxx = this->ComputeIncludes(source, "RAW", config);
     const char *p = xxx.c_str();
@@ -1465,9 +1458,12 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
         for (const auto& o : ooo.outs) {
           oout.insert(o);
         }
+        if (ooo.needPrescan) {
+          need = true;
+        }
         if (ooo.hasDirs) {
           ++hazure;
-#if 1
+#if 0
           fprintf(stderr, "\t%s:hazure<%s>\n", this->GetTargetName().c_str(), ooo.target->GetName().c_str());
 #endif
         }
@@ -1475,22 +1471,49 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
     }
 
     if (!hits.empty()) {
+      if (ooent.incomplete) {
+        fprintf(stderr, "\tINCOMPLETE\n");
+        objBuild.OrderOnlyDeps.push_back(this->OrderDependsTargetForTarget(config));
+      }
       //objBuild.OrderOnlyDeps.push_back("KOKOKARA");
       hit = true;
       cm::append(objBuild.OrderOnlyDeps, oout);
+#if 0
       ddd.files.emplace_back(sourceFileName, objectFileName);
       ddd.defines_args.insert(vars["DEFINES"]);
       ddd.flags_args.insert(vars["FLAGS"]);
       ddd.includes_args.insert(vars["INCLUDES"]);
       ddd.cmdlines[objectFileName] = cmdline;
       ddd.vfiles = std::move(vfiles);
-      objBuild.OrderOnlyDeps.push_back(ddd.scanner_name);
       vars["dyndep"] = ddd.scanner_name;
+      objBuild.OrderOnlyDeps.push_back(ddd.scanner_name);
+#endif
     } else {
       objBuild.OrderOnlyDeps.push_back(this->OrderDependsTargetForTarget(config));
     }
   } else {
     objBuild.OrderOnlyDeps.push_back(this->OrderDependsTargetForTarget(config));
+
+#if 0
+    for (const auto& ooo : ooent.ttts) {
+      if (ooo.needPrescan) {
+        need = true;
+        fprintf(stderr, "NEED2\n");
+        break;
+      }
+    }
+#endif
+  }
+
+  if (hit || need) {
+    ddd.files.emplace_back(sourceFileName, objectFileName);
+    ddd.defines_args.insert(vars["DEFINES"]);
+    ddd.flags_args.insert(vars["FLAGS"]);
+    ddd.includes_args.insert(vars["INCLUDES"]);
+    ddd.cmdlines[objectFileName] = cmdline;
+    ddd.vfiles = std::move(vfiles);
+    vars["dyndep"] = ddd.scanner_name;
+    objBuild.OrderOnlyDeps.push_back(ddd.scanner_name);
   }
 #else
   objBuild.OrderOnlyDeps.push_back(this->OrderDependsTargetForTarget(config));

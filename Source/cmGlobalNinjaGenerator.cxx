@@ -1305,6 +1305,7 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
     }
 
     bool incomplete = false;
+    bool has_anchor = false;
     int orig_size = queue0.size();
     for (int i = 0; i < queue0.size(); ++i) {
       auto& oooent = queue0[i];
@@ -1374,6 +1375,18 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
             ent.files[rout].insert(targetDep);
             if (!queue0[i].hasDirs) fprintf(stderr, "\t<%s> hasdirs\n", targetDep->GetName().c_str());
             queue0[i].hasDirs = true;
+#if 1
+            if (targetDep->GetPropertyAsBool("XXXPRESCAN")) {
+              queue0[i].needPrescan = true;
+            }
+#endif
+#if 0
+            if (rout == "include/stub_anchor.h") {
+              fprintf(stderr, "\tANCHOR<%s>%d\n",
+                      targetDep->GetName().c_str(),
+                      targetDep->GetPropertyAsBool("XXXPRESCAN"));
+            }
+#endif
             ++cusn;
           }
         }
@@ -1406,7 +1419,11 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
     }
 
     if (incomplete) {
+#if 1
+      ent.incomplete = true;
+#else
       ent.files.clear();
+#endif
     }
 
     fprintf(stderr, "d=%d\n",

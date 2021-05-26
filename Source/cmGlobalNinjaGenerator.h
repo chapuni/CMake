@@ -564,6 +564,7 @@ public:
     const cmGeneratorTarget* target;
     bool isCross;
     bool hasDirs;
+    bool needPrescan;
     cmNinjaDeps outs;
 
     OOO(const cmTargetDepend& td) : target(td), isCross(td.IsCross()), hasDirs(false), outs() {}
@@ -572,6 +573,7 @@ public:
 
   struct OrderOnlyDepCacheEnt {
     bool valid;
+    bool incomplete;
     cmNinjaDeps SortedDeps;
 #if 0
     int szO, szc;
