@@ -42,6 +42,32 @@
 #include "cmSystemTools.h"
 #include "cmake.h"
 
+struct DyndepRecord {
+  std::string filename;
+
+  struct SrcTgtPair {
+    std::string source_fn;
+    std::string target_fn;
+
+    SrcTgtPair(const std::string& src,
+               const std::string& tgt)
+      : source_fn(src),
+        target_fn(tgt)
+    {}
+  };
+
+  std::vector<SrcTgtPair> files;
+
+  std::unordered_map<std::string, std::string> cmdlines;
+
+  std::unordered_set<std::string> vfiles;
+  std::unordered_set<std::string> defines_args;
+  std::unordered_set<std::string> flags_args;
+  std::unordered_set<std::string> includes_args;
+
+  DyndepRecord() = default;
+};
+
 std::unique_ptr<cmNinjaTargetGenerator> cmNinjaTargetGenerator::New(
   cmGeneratorTarget* target)
 {
@@ -1048,16 +1074,16 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatements(
     std::vector<cmSourceFile const*> objectSources;
     this->GeneratorTarget->GetObjectSources(objectSources, config);
 
-    DDD ddd;
+    DyndepRecord dyndep;
     std::string prescanner_cmd = this->Makefile->GetSafeDefinition("CMAKE_CXX_EXPERIMENTAL_PRESCANNER");
     if (prescanner_cmd != "") {
-      ddd.scanner_name = GetDyndepFilePath("CXX", config);
+      dyndep.filename = GetDyndepFilePath("CXX", config);
     }
     for (cmSourceFile const* sf : objectSources) {
-      this->WriteObjectBuildStatement(sf, config, ddd, fileConfig, firstForConfig);
+      this->WriteObjectBuildStatement(sf, config, dyndep, fileConfig, firstForConfig);
     }
 
-    if (!ddd.files.empty()) {
+    if (!dyndep.files.empty()) {
       std::string cdir =
         cmStrCat(this->Makefile->GetCurrentBinaryDirectory(), '/',
                  this->LocalGenerator->GetTargetDirectory(this->GeneratorTarget),
@@ -1068,21 +1094,21 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatements(
       cmNinjaBuild scanner("CUSTOM_COMMAND");
 
       auto& cmd = scanner.Variables["COMMAND"];
-      for (const auto& f : ddd.files) {
+      for (const auto& f : dyndep.files) {
         scanner.ExplicitDeps.push_back(f.source_fn);
         cmd += " " + f.source_fn + " " + f.target_fn;
       }
 
-      scanner.Outputs.push_back(ddd.scanner_name);
-      if (ddd.includes_args.size() != 1 || ddd.defines_args.size() != 1 || ddd.flags_args.size() != 1) {
-        scanner.Comment = cmStrCat("XXX: flags is not identical(", ddd.includes_args.size(), ")");
+      scanner.Outputs.push_back(dyndep.filename);
+      if (dyndep.includes_args.size() != 1 || dyndep.defines_args.size() != 1 || dyndep.flags_args.size() != 1) {
+        scanner.Comment = cmStrCat("XXX: flags is not identical(", dyndep.includes_args.size(), ")");
       }
 
       cmd = cmStrCat(prescanner_cmd,
                      " --compilation-database=", path,
                      " --cdbx=", pathx,
                      " > ",
-                     ddd.scanner_name);
+                     dyndep.filename);
 
       scanner.Variables["DESC"] = cmStrCat("Scanning deps in ", this->GetTargetName());
 
@@ -1090,11 +1116,11 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatements(
 
       Json::Value cdb(Json::arrayValue);
       bool vemit = false;
-      for (auto& f : ddd.files) {
+      for (auto& f : dyndep.files) {
         Json::Value ent(Json::objectValue);
         auto& cu = cdb.append(Json::objectValue);
         cu["directory"] = this->Makefile->GetHomeOutputDirectory();
-        cu["command"] = ddd.cmdlines[f.target_fn];
+        cu["command"] = dyndep.cmdlines[f.target_fn];
         cu["file"] = f.source_fn;
       }
 
@@ -1109,17 +1135,17 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatements(
       // List of vfiles
       auto& vfiles = cdbx["vfiles"] = Json::arrayValue;
       std::set<std::string> vfiles_sorted;
-      vfiles_sorted.insert(ddd.vfiles.cbegin(), ddd.vfiles.cend());
+      vfiles_sorted.insert(dyndep.vfiles.cbegin(), dyndep.vfiles.cend());
       for (auto& f : vfiles_sorted) {
         vfiles.append(f);
       }
 
-      cdbx["defines_args"] = *ddd.defines_args.begin();
-      cdbx["flags_args"] = *ddd.flags_args.begin();
-      cdbx["include_args"] = *ddd.includes_args.begin();
+      cdbx["defines_args"] = *dyndep.defines_args.begin();
+      cdbx["flags_args"] = *dyndep.flags_args.begin();
+      cdbx["include_args"] = *dyndep.includes_args.begin();
 
       auto& cdbx_targets = cdbx["targets"] = Json::objectValue;
-      for (const auto& ts : ddd.files) {
+      for (const auto& ts : dyndep.files) {
         cdbx_targets[ts.target_fn] = ts.source_fn;
       }
 
@@ -1272,7 +1298,7 @@ cmNinjaBuild GetScanBuildStatement(const std::string& ruleName,
 
 void cmNinjaTargetGenerator::WriteObjectBuildStatement(
   cmSourceFile const* source, const std::string& config,
-  DDD& ddd,
+  DyndepRecord& dyndep,
   const std::string& fileConfig, bool firstForConfig)
 {
   std::string const language = source->GetLanguage();
@@ -1396,7 +1422,7 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
   const auto& oo2ent = this->GetGlobalGenerator()->OO2Cache[ooname];
   const auto& ooent = this->GetGlobalGenerator()->OrderOnlyDepCache[oo2ent.target];
   std::unordered_set<std::string> vfiles;
-  if (ddd.scanner_name != "" && ooent.files.size() > 0) {
+  if (dyndep.filename != "" && ooent.files.size() > 0) {
     std::unordered_set<const cmGeneratorTarget*> hits;
     vfiles = oo2ent.appendices;
 
@@ -1442,14 +1468,14 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
   }
 
   if (hit) {
-    ddd.files.emplace_back(sourceFileName, objectFileName);
-    ddd.defines_args.insert(vars["DEFINES"]);
-    ddd.flags_args.insert(vars["FLAGS"]);
-    ddd.includes_args.insert(vars["INCLUDES"]);
-    ddd.cmdlines[objectFileName] = cmdline;
-    ddd.vfiles = std::move(vfiles);
-    vars["dyndep"] = ddd.scanner_name;
-    objBuild.OrderOnlyDeps.push_back(ddd.scanner_name);
+    dyndep.files.emplace_back(sourceFileName, objectFileName);
+    dyndep.defines_args.insert(vars["DEFINES"]);
+    dyndep.flags_args.insert(vars["FLAGS"]);
+    dyndep.includes_args.insert(vars["INCLUDES"]);
+    dyndep.cmdlines[objectFileName] = cmdline;
+    dyndep.vfiles = std::move(vfiles);
+    vars["dyndep"] = dyndep.filename;
+    objBuild.OrderOnlyDeps.push_back(dyndep.filename);
   }
 
   // If the source file is GENERATED and does not have a custom command
