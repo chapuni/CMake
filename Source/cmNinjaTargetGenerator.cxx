@@ -1018,24 +1018,11 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatements(
                      this->MapToNinjaPath());
     }
 
-#if 1
     auto& ooe = this->GetGlobalGenerator()->OO2Cache[this->OrderDependsTargetForTarget(config)];
     ooe.target = this->GeneratorTarget;
     for (; ooi < orderOnlyDeps.size(); ++ooi) {
       ooe.appendices.insert(orderOnlyDeps[ooi]);
     }
-#endif
-
-#if 0
-    {
-      auto& xxx = this->GetGlobalGenerator()->OrderOnlyDepCache[this->OrderDependsTargetForTarget(config)];
-      for (; ooi < orderOnlyDeps.size(); ++ooi) {
-        xxx.extra.insert(orderOnlyDeps[ooi]);
-        fprintf(stderr, "\t* %s %s\n", this->OrderDependsTargetForTarget(config).c_str(), orderOnlyDeps[ooi].c_str());
-      }
-    }
-#endif
-
     std::sort(orderOnlyDeps.begin(), orderOnlyDeps.end());
     orderOnlyDeps.erase(
       std::unique(orderOnlyDeps.begin(), orderOnlyDeps.end()),
@@ -1060,7 +1047,6 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatements(
   {
     std::vector<cmSourceFile const*> objectSources;
     this->GeneratorTarget->GetObjectSources(objectSources, config);
-
 
     DDD ddd;
     std::string prescanner_cmd = this->Makefile->GetSafeDefinition("CMAKE_CXX_EXPERIMENTAL_PRESCANNER");
@@ -1092,7 +1078,6 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatements(
         scanner.Comment = cmStrCat("XXX: flags is not identical(", ddd.includes_args.size(), ")");
       }
 
-      fprintf(stderr, "<%s>\n", prescanner_cmd.c_str());
       cmd = cmStrCat(prescanner_cmd,
                      " --compilation-database=", path,
                      " --cdbx=", pathx,
@@ -1194,7 +1179,6 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatements(
     cmGeneratedFileStream output(mapFilePath);
     output << this->Configs[config].SwiftOutputMap;
   }
-
 }
 
 namespace {
@@ -1407,14 +1391,11 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
                    this->MapToNinjaPath());
   }
 
-#if 1
-  bool need = false;
   bool hit = false;
   std::string ooname = this->OrderDependsTargetForTarget(config);
   const auto& oo2ent = this->GetGlobalGenerator()->OO2Cache[ooname];
   const auto& ooent = this->GetGlobalGenerator()->OrderOnlyDepCache[oo2ent.target];
   std::unordered_set<std::string> vfiles;
-  fprintf(stderr, "<%s:>dirs=%d apps=%d\n", ooname.c_str(), ooent.files.size(), oo2ent.appendices.size());
   if (ddd.scanner_name != "" && ooent.files.size() > 0) {
     std::unordered_set<const cmGeneratorTarget*> hits;
     vfiles = oo2ent.appendices;
@@ -1427,85 +1408,40 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
       if (p0 == NULL) p0 = e;
       std::string include_dir(p, p0);
       p = p0 + 1;
-#if 0
-      fprintf(stderr, "\tINC<%s>\n", include_dir.c_str());
-#endif
       for (const auto& outs : ooent.files) {
         auto outdir = cmSystemTools::GetFilenamePath(outs.first);
         if (cmSystemTools::IsSubDirectory(outs.first, include_dir)) {
           vfiles.insert(outs.first);
           for (const auto ddt : outs.second) {
-#if 0
-            if (hits.find(ddt) == hits.end()) {
-              fprintf(stderr, "\thit<%s><%s>%s\n", include_dir.c_str(), outs.first.c_str(), ddt->GetName().c_str());
-            }
-#endif
             hits.insert(ddt);
           }
-        } else {
-#if 0
-          fprintf(stderr, "\tINC<%s>NOTHIT<%s><%s>\n", include_dir.c_str(), outdir.c_str(), outs.first.c_str());
-#endif
         }
       }
     }
 
     std::unordered_set<std::string> oout;
-    int hazure = 0;
     for (const auto& ooo : ooent.ttts) {
       if (hits.find(ooo.target) == hits.end()) {
-        //oout.insert("<<<" + ooo.target->GetName() + ">>>");
         for (const auto& o : ooo.outs) {
           oout.insert(o);
-        }
-        if (ooo.needPrescan) {
-          need = true;
-        }
-        if (ooo.hasDirs) {
-          ++hazure;
-#if 0
-          fprintf(stderr, "\t%s:hazure<%s>\n", this->GetTargetName().c_str(), ooo.target->GetName().c_str());
-#endif
         }
       }
     }
 
     if (!hits.empty()) {
       if (ooent.incomplete) {
-        fprintf(stderr, "\tINCOMPLETE\n");
         objBuild.OrderOnlyDeps.push_back(this->OrderDependsTargetForTarget(config));
       }
-      //objBuild.OrderOnlyDeps.push_back("KOKOKARA");
       hit = true;
       cm::append(objBuild.OrderOnlyDeps, oout);
-#if 0
-      ddd.files.emplace_back(sourceFileName, objectFileName);
-      ddd.defines_args.insert(vars["DEFINES"]);
-      ddd.flags_args.insert(vars["FLAGS"]);
-      ddd.includes_args.insert(vars["INCLUDES"]);
-      ddd.cmdlines[objectFileName] = cmdline;
-      ddd.vfiles = std::move(vfiles);
-      vars["dyndep"] = ddd.scanner_name;
-      objBuild.OrderOnlyDeps.push_back(ddd.scanner_name);
-#endif
     } else {
       objBuild.OrderOnlyDeps.push_back(this->OrderDependsTargetForTarget(config));
     }
   } else {
     objBuild.OrderOnlyDeps.push_back(this->OrderDependsTargetForTarget(config));
-
-#if 0
-    for (const auto& ooo : ooent.ttts) {
-      if (ooo.needPrescan) {
-        need = true;
-        fprintf(stderr, "NEED2\n");
-        break;
-      }
-    }
-#endif
   }
 
-  if (hit || need) {
+  if (hit) {
     ddd.files.emplace_back(sourceFileName, objectFileName);
     ddd.defines_args.insert(vars["DEFINES"]);
     ddd.flags_args.insert(vars["FLAGS"]);
@@ -1515,9 +1451,6 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
     vars["dyndep"] = ddd.scanner_name;
     objBuild.OrderOnlyDeps.push_back(ddd.scanner_name);
   }
-#else
-  objBuild.OrderOnlyDeps.push_back(this->OrderDependsTargetForTarget(config));
-#endif
 
   // If the source file is GENERATED and does not have a custom command
   // (either attached to this source file or another one), assume that one of

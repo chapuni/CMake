@@ -33,9 +33,9 @@ struct DDD {
     std::string target_fn;
 
     EEE(const std::string& src,
-	const std::string& tgt)
+        const std::string& tgt)
       : source_fn(src),
-	target_fn(tgt)
+        target_fn(tgt)
     {}
   };
 

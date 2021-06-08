@@ -559,30 +559,21 @@ private:
 
 #if 1
 public:
-#if 1
   struct OOO {
     const cmGeneratorTarget* target;
     bool isCross;
     bool hasDirs;
-    bool needPrescan;
     cmNinjaDeps outs;
 
     OOO(const cmTargetDepend& td) : target(td), isCross(td.IsCross()), hasDirs(false), outs() {}
   };
-#endif
 
   struct OrderOnlyDepCacheEnt {
     bool valid;
     bool incomplete;
     cmNinjaDeps SortedDeps;
-#if 0
-    int szO, szc;
-    cmNinjaDeps depsO;
-    cmNinjaDeps depsc;
-#endif
     std::unordered_map<std::string, std::unordered_set<const cmGeneratorTarget*>> files;
     std::vector<OOO> ttts;
-    //std::vector<cmTargetDepend> ttts;
   };
 
   std::unordered_map<const cmGeneratorTarget*, OrderOnlyDepCacheEnt> OrderOnlyDepCache;

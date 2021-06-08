@@ -1257,7 +1257,6 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
       }
     };
 
-#if 1
     if (depends != DependOnTargetOrdering) {
       cmNinjaDeps outs;
 
@@ -1278,9 +1277,7 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
       cm::append(outputs, outs);
       return;
     }
-#endif
 
-    //std::string name = this->OrderDependsTargetForTarget(target, config);
     auto& ent = this->OrderOnlyDepCache[target];
     if (ent.valid) {
       cm::append(outputs, ent.SortedDeps);
@@ -1289,7 +1286,6 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
 
     ent = OrderOnlyDepCacheEnt();
 
-    //std::vector<cmTargetDepend> queue0;
     auto& queue0 = ent.ttts;
     std::unordered_set<const cmGeneratorTarget*> queueset0;
     for (const auto& targetDep : this->GetTargetDirectDepends(target)) {
@@ -1297,11 +1293,6 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
         queue0.emplace_back(targetDep);
         queueset0.insert(targetDep);
       }
-    }
-
-    fprintf(stderr, "<%s:>%d\n", target->GetName().c_str(), queue0.size());
-    for (const auto& x : queue0) {
-      fprintf(stderr, "\t<%s>\n", x.target->GetName().c_str());
     }
 
     bool incomplete = false;
@@ -1335,30 +1326,16 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
 
       if (tos == 1 && oooent.outs[0] == ooname) {
         if (this->OO2Cache.find(ooname) == this->OO2Cache.end()) {
-          fprintf(stderr, "\tNOTFOUND<%s>\n", ooname.c_str());
           incomplete = true;
         } else {
           const auto& oo2oo = this->OO2Cache[ooname];
           const auto& oo2ent = this->OrderOnlyDepCache[oo2oo.target];
-          fprintf(stderr, "\too<%s>%d\n", ooname.c_str(), oo2ent.ttts.size());
-          for (auto& s : oo2oo.appendices) {
-            fprintf(stderr, "\t<%s>\tapp<%s>\n", ooname.c_str(), s.c_str());
-          }
           for (const auto& d : oo2ent.ttts) {
             if (queueset0.find(d.target) == queueset0.end()) {
               queue0.push_back(d);
               queueset0.insert(d.target);
-              fprintf(stderr, "\t\tADD<%s>%d %d\n", d.target->GetName().c_str(), d.outs.size(), queue0[queue0.size() - 1].outs.size());
-            } else {
-              //fprintf(stderr, "\t\tDUP<%s>\n", d.target->GetName().c_str());
             }
           }
-          fprintf(stderr, "\tFOUND<%d.%s>%d(%s)\n", i, queue0[i].target->GetName().c_str(), queue0[i].outs.size(), (queue0[i].outs.size() >= 1 ? queue0[i].outs[0].c_str() : "(nil)"));
-#if 0
-          fprintf(stderr, "\tFOUND<%d.%s>\n", i, queue0[i].target->GetName().c_str());
-          fprintf(stderr, "\t\%d\n", queue0[i].outs.size());
-          fprintf(stderr, "\t\(%s)\n", queue0[i].outs[0].c_str());
-#endif
           queue0.erase(queue0.begin() + i--);
         }
       } else if (targetDep->GetType() == cmStateEnums::UTILITY) {
@@ -1371,22 +1348,8 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
           if (ccg.GetNumberOfCommands() == 0) continue;
           for (auto& out : ccg.GetOutputs()) {
             auto rout = this->ConvertToNinjaPath(out);
-            //rout =  cmSystemTools::GetFilenamePath(rout);
             ent.files[rout].insert(targetDep);
-            if (!queue0[i].hasDirs) fprintf(stderr, "\t<%s> hasdirs\n", targetDep->GetName().c_str());
             queue0[i].hasDirs = true;
-#if 1
-            if (targetDep->GetPropertyAsBool("XXXPRESCAN")) {
-              queue0[i].needPrescan = true;
-            }
-#endif
-#if 0
-            if (rout == "include/stub_anchor.h") {
-              fprintf(stderr, "\tANCHOR<%s>%d\n",
-                      targetDep->GetName().c_str(),
-                      targetDep->GetPropertyAsBool("XXXPRESCAN"));
-            }
-#endif
             ++cusn;
           }
         }
@@ -1395,50 +1358,17 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
             if (queueset0.find(tdd) == queueset0.end()) {
               queue0.emplace_back(tdd);
               queueset0.insert(tdd);
-              fprintf(stderr, "\t\tADD<%s>%d\n", tdd->GetName().c_str(), queue0[queue0.size() - 1].outs.size());
             }
           }
           queue0.erase(queue0.begin() + i--);
         }
-      } else {
-        fprintf(stderr, "\tOTHERS<%s>%d\n", targetDep->GetName().c_str(), tos);
-        for (const auto& o : queue0[i].outs) {
-          fprintf(stderr, "\t\t<%s>\n", o.c_str());
-        }
-      }
-    }
-
-    if (!incomplete) {
-      for (const auto& o : ent.files) {
-        fprintf(stderr, "\tI %s %d", o.first.c_str(), cmSystemTools::IsSubDirectory(o.first, "include"));
-        for (const auto& t : o.second) {
-          fprintf(stderr, " %s", t->GetName().c_str());
-        }
-        fprintf(stderr, "\n");
       }
     }
 
     if (incomplete) {
-#if 1
       ent.incomplete = true;
-#else
-      ent.files.clear();
-#endif
     }
 
-    fprintf(stderr, "d=%d\n",
-            ent.ttts.size());
-#if 0
-    std::unordered_set<std::string> aaa;
-    for (const auto& t : ent.ttts) {
-      fprintf(stderr, "\t%s(", t.target->GetName().c_str());
-      for (const auto& s : t.outs) {
-        aaa.insert(s);
-        fprintf(stderr, " %s", s.c_str());
-      }
-      fprintf(stderr, " )\n");
-    }
-#endif
     std::sort(ent.SortedDeps.begin(), ent.SortedDeps.end());
     cm::append(outputs, ent.SortedDeps);
   }
