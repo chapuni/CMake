@@ -1446,9 +1446,9 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
     }
 
     std::unordered_set<std::string> oout;
-    for (const auto& ooo : ooent.ttts) {
-      if (hits.find(ooo.target) == hits.end()) {
-        for (const auto& o : ooo.outs) {
+    for (const cmGlobalNinjaGenerator::TargetDependCacheEnt& oodep : ooent.TargetDepends) {
+      if (hits.find(oodep.target) == hits.end()) {
+        for (const auto& o : oodep.outs) {
           oout.insert(o);
         }
       }

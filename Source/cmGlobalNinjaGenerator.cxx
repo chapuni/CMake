@@ -1286,7 +1286,7 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
 
     ent = OrderOnlyDepCacheEnt();
 
-    auto& queue0 = ent.ttts;
+    auto& queue0 = ent.TargetDepends;
     std::unordered_set<const cmGeneratorTarget*> queueset0;
     for (const auto& targetDep : this->GetTargetDirectDepends(target)) {
       if (queueset0.find(targetDep) == queueset0.end()) {
@@ -1299,38 +1299,38 @@ void cmGlobalNinjaGenerator::AppendTargetDepends(
     bool has_anchor = false;
     int orig_size = queue0.size();
     for (int i = 0; i < queue0.size(); ++i) {
-      auto& oooent = queue0[i];
-      const auto targetDep = oooent.target;
+      TargetDependCacheEnt& oocent = queue0[i];
+      const auto targetDep = oocent.target;
 
       if (!targetDep->IsInBuildSystem()) {
         continue;
       }
 
-      std::string tconfig = (oooent.isCross ? fileConfig : config);
+      std::string tconfig = (oocent.isCross ? fileConfig : config);
       std::string ooname = this->OrderDependsTargetForTarget(targetDep, tconfig);
 
-      for (int j = 0; j < oooent.outs.size(); ++j) {
-        if (oooent.outs[j] == ooname) {
-          oooent.outs.erase(oooent.outs.begin() + j--);
+      for (int j = 0; j < oocent.outs.size(); ++j) {
+        if (oocent.outs[j] == ooname) {
+          oocent.outs.erase(oocent.outs.begin() + j--);
         }
       }
 
-      this->AppendTargetOutputs(targetDep, oooent.outs, tconfig, DependOnTargetOrdering);
-      int tos = oooent.outs.size();
-      computeISPCOuputs(this, targetDep, oooent.outs, tconfig);
+      this->AppendTargetOutputs(targetDep, oocent.outs, tconfig, DependOnTargetOrdering);
+      int tos = oocent.outs.size();
+      computeISPCOuputs(this, targetDep, oocent.outs, tconfig);
 
       if (orig_size > 0) {
-        cm::append(ent.SortedDeps, oooent.outs);
+        cm::append(ent.SortedDeps, oocent.outs);
         --orig_size;
       }
 
-      if (tos == 1 && oooent.outs[0] == ooname) {
+      if (tos == 1 && oocent.outs[0] == ooname) {
         if (this->OO2Cache.find(ooname) == this->OO2Cache.end()) {
           incomplete = true;
         } else {
           const auto& oo2oo = this->OO2Cache[ooname];
           const auto& oo2ent = this->OrderOnlyDepCache[oo2oo.target];
-          for (const auto& d : oo2ent.ttts) {
+          for (const auto& d : oo2ent.TargetDepends) {
             if (queueset0.find(d.target) == queueset0.end()) {
               queue0.push_back(d);
               queueset0.insert(d.target);
